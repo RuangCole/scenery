@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>随机图片展示</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+        
+        #image-container {
+            width: 100%;
+            height: 500px;
+            margin: 20px 0;
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+            background-color: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        #random-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transition: opacity 0.3s ease;
+        }
+        
+        .loading {
+            font-size: 18px;
+            color: #7f8c8d;
+        }
+        
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        button {
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        #random-btn {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        #random-btn:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+        
+        #prev-btn {
+            background-color: #95a5a6;
+            color: white;
+        }
+        
+        #prev-btn:hover {
+            background-color: #7f8c8d;
+        }
+        
+        .info-panel {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .info-value {
+            color: #3498db;
+        }
+        
+        .file-list {
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            background-color: #f8f9fa;
+        }
+        
+        .file-item {
+            padding: 8px;
+            margin: 5px 0;
+            background-color: white;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            #image-container {
+                height: 400px;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 随机图片展示器</h1>
+        <div class="subtitle">点击按钮随机显示GitHub仓库中的图片</div>
+        
+        <div id="image-container">
+            <div class="loading">正在加载图片...</div>
+            <img id="random-image" src="" alt="随机图片" style="display: none;">
+        </div>
+        
+        <div class="controls">
+            <button id="prev-btn" title="上一张">
+                <span>←</span> 上一张
+            </button>
+            <button id="random-btn" title="随机一张">
+                <span>🎲</span> 随机一张
+            </button>
+        </div>
+        
+        <div class="info-panel">
+            <div class="info-item">
+                <span class="info-label">当前图片：</span>
+                <span id="current-filename" class="info-value">-</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">图片序号：</span>
+                <span id="current-index" class="info-value">-</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">总图片数：</span>
+                <span id="total-count" class="info-value">-</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">最后更新：</span>
+                <span id="last-updated" class="info-value">-</span>
+            </div>
+        </div>
+        
+        <div id="file-list-container" style="display: none;">
+            <h3>📁 所有图片文件</h3>
+            <div class="file-list" id="file-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // ========== 配置区域 ==========
+        const CONFIG = {
+            // 修改以下信息为你的GitHub信息
+            GITHUB_USERNAME: 'YOUR_USERNAME',      // 你的GitHub用户名
+            REPOSITORY_NAME: 'YOUR_REPO_NAME',     // 你的仓库名
+            IMAGE_FOLDER: 'images',               // 图片文件夹名
+            BRANCH: 'main',                       // 分支名，默认main
+            
+            // 可选：设置支持的图片格式
+            ALLOWED_EXTENSIONS: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'],
+            
+            // 可选：设置缓存时间（毫秒）
+            CACHE_DURATION: 5 * 60 * 1000, // 5分钟
+        };
+        // ========== 配置结束 ==========
+
+        // 状态管理
+        let state = {
+            imageList: [],           // 所有图片文件名数组
+            currentIndex: -1,        // 当前显示的图片索引
+            previousIndex: -1,       // 上一张图片索引
+            isLoading: false,        // 加载状态
+            lastUpdateTime: null,    // 最后更新时间
+            history: []              // 浏览历史
+        };
+
+        // DOM元素
+        const elements = {
+            image: document.getElementById('random-image'),
+            container: document.getElementById('image-container'),
+            loading: document.querySelector('.loading'),
+            randomBtn: document.getElementById('random-btn'),
+            prevBtn: document.getElementById('prev-btn'),
+            currentFilename: document.getElementById('current-filename'),
+            currentIndex: document.getElementById('current-index'),
+            totalCount: document.getElementById('total-count'),
+            lastUpdated: document.getElementById('last-updated'),
+            fileList: document.getElementById('file-list'),
+            fileListContainer: document.getElementById('file-list-container')
+        };
+
+        // 初始化
+        async function init() {
+            showLoading(true);
+            try {
+                // 从GitHub API获取图片列表
+                await fetchImageList();
+                
+                if (state.imageList.length > 0) {
+                    // 显示第一张随机图片
+                    showRandomImage();
+                    
+                    // 显示文件列表（可选）
+                    displayFileList();
+                    
+                    updateInfoPanel();
+                } else {
+                    showError('未找到图片文件，请检查配置');
+                }
+            } catch (error) {
+                showError('初始化失败：' + error.message);
+            } finally {
+                showLoading(false);
+            }
+            
+            // 绑定事件
+            setupEventListeners();
+        }
+
+        // 从GitHub API获取图片列表
+        async function fetchImageList() {
+            try {
+                const apiUrl = `https://api.github.com/repos/${CONFIG.GITHUB_USERNAME}/${CONFIG.REPOSITORY_NAME}/contents/${CONFIG.IMAGE_FOLDER}?ref=${CONFIG.BRANCH}`;
+                
+                console.log('正在从GitHub获取图片列表...');
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`GitHub API请求失败: ${response.status}`);
+                }
+                
+                const files = await response.json();
+                
+                // 过滤出图片文件
+                state.imageList = files
+                    .filter(file => !file.name.startsWith('.')) // 排除隐藏文件
+                    .filter(file => CONFIG.ALLOWED_EXTENSIONS.some(ext => 
+                        file.name.toLowerCase().endsWith('.' + ext)
+                    ))
+                    .map(file => ({
+                        name: file.name,
+                        url: file.download_url,
+                        size: file.size,
+                        path: file.path
+                    }));
+                
+                state.lastUpdateTime = new Date();
+                
+                console.log(`找到 ${state.imageList.length} 张图片`);
+                
+            } catch (error) {
+                console.error('获取图片列表失败:', error);
+                
+                // 备用方案：如果API失败，尝试直接构建URL（需要知道图片命名规则）
+                // 你可以在这里添加备用逻辑
+                throw error;
+            }
+        }
+
+        // 显示随机图片
+        function showRandomImage() {
+            if (state.imageList.length === 0) return;
+            
+            // 生成随机索引（确保不重复连续显示同一张）
+            let randomIndex;
+            do {
+                randomIndex = Math.floor(Math.random() * state.imageList.length);
+            } while (randomIndex === state.currentIndex && state.imageList.length > 1);
+            
+            showImageByIndex(randomIndex);
+        }
+
+        // 显示上一张图片
+        function showPreviousImage() {
+            if (state.history.length < 2) return;
+            
+            // 移除当前图片
+            state.history.pop();
+            // 获取上一张图片
+            const previousIndex = state.history[state.history.length - 1];
+            
+            if (previousIndex !== undefined) {
+                showImageByIndex(previousIndex, false);
+            }
+        }
+
+        // 显示指定索引的图片
+        function showImageByIndex(index, addToHistory = true) {
+            if (index < 0 || index >= state.imageList.length) return;
+            
+            state.previousIndex = state.currentIndex;
+            state.currentIndex = index;
+            
+            if (addToHistory) {
+                state.history.push(index);
+                // 限制历史记录长度
+                if (state.history.length > 20) {
+                    state.history.shift();
+                }
+            }
+            
+            const imageData = state.imageList[index];
+            
+            showLoading(true);
+            
+            // 预加载图片
+            const img = new Image();
+            img.onload = function() {
+                elements.image.src = imageData.url;
+                elements.image.style.display = 'block';
+                elements.loading.style.display = 'none';
+                
+                updateInfoPanel();
+                updateButtonStates();
+                
+                // 添加加载完成动画
+                elements.image.style.opacity = '0';
+                setTimeout(() => {
+                    elements.image.style.transition = 'opacity 0.5s ease';
+                    elements.image.style.opacity = '1';
+                }, 10);
+                
+                showLoading(false);
+            };
+            
+            img.onerror = function() {
+                showError(`图片加载失败: ${imageData.name}`);
+                showLoading(false);
+            };
+            
+            img.src = imageData.url;
+        }
+
+        // 更新信息面板
+        function updateInfoPanel() {
+            if (state.currentIndex >= 0 && state.imageList[state.currentIndex]) {
+                const currentImage = state.imageList[state.currentIndex];
+                
+                elements.currentFilename.textContent = currentImage.name;
+                elements.currentIndex.textContent = `${state.currentIndex + 1} / ${state.imageList.length}`;
+                elements.totalCount.textContent = state.imageList.length;
+                
+                if (state.lastUpdateTime) {
+                    elements.lastUpdated.textContent = state.lastUpdateTime.toLocaleTimeString();
+                }
+            }
+        }
+
+        // 更新按钮状态
+        function updateButtonStates() {
+            elements.prevBtn.disabled = state.history.length < 2;
+        }
+
+        // 显示文件列表
+        function displayFileList() {
+            if (state.imageList.length === 0) return;
+            
+            elements.fileList.innerHTML = '';
+            
+            state.imageList.forEach((image, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>${image.name}</span>
+                        <span style="font-size: 12px; color: #666;">
+                            ${formatFileSize(image.size)}
+                        </span>
+                    </div>
+                `;
+                
+                fileItem.addEventListener('click', () => {
+                    showImageByIndex(index);
+                });
+                
+                elements.fileList.appendChild(fileItem);
+            });
+            
+            elements.fileListContainer.style.display = 'block';
+        }
+
+        // 显示加载状态
+        function showLoading(isLoading) {
+            state.isLoading = isLoading;
+            elements.randomBtn.disabled = isLoading;
+            elements.prevBtn.disabled = isLoading;
+            
+            if (isLoading) {
+                elements.loading.style.display = 'block';
+                elements.image.style.display = 'none';
+            }
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            elements.container.innerHTML = `
+                <div style="text-align: center; color: #e74c3c; padding: 40px;">
+                    <div style="font-size: 48px;">❌</div>
+                    <h3>出错了</h3>
+                    <p>${message}</p>
+                    <button onclick="location.reload()" style="padding: 10px 20px; margin-top: 20px;">
+                        重新加载
+                    </button>
+                </div>
+            `;
+        }
+
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === undefined) return '未知大小';
+            if (bytes === 0) return '0 Bytes';
+            
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 随机按钮
+            elements.randomBtn.addEventListener('click', showRandomImage);
+            
+            // 上一张按钮
+            elements.prevBtn.addEventListener('click', showPreviousImage);
+            
+            // 键盘快捷键
+            document.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+                
+                switch(e.key) {
+                    case ' ':
+                    case 'Enter':
+                        e.preventDefault();
+                        showRandomImage();
+                        break;
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        showPreviousImage();
+                        break;
+                    case 'r':
+                    case 'R':
+                        if (e.ctrlKey) {
+                            e.preventDefault();
+                            init();
+                        }
+                        break;
+                }
+            });
+            
+            // 防止空格键滚动页面
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'Space' && e.target === document.body) {
+                    e.preventDefault();
+                }
+            });
+        }
+
+        // 页面加载完成后初始化
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
